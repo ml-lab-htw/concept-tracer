@@ -1,0 +1,18 @@
+dash
+imbalanced-learn
+# ipykernel
+# jupyter
+# kaleido
+# mosek
+numpy
+pandas
+plotly
+# pytest
+scikit-learn
+scipy
+torch
+tqdm
+
+# most recent as of January 2026
+tabpfn==6.3.2
+tabpfn-extensions==0.2.2
