@@ -13,8 +13,8 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.base import ClassifierMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
-from sklearn.feature_selection import SelectKBest
-from sklearn.linear_model import LogisticRegression
+from sklearn.feature_selection import SelectFromModel, SelectKBest
+from sklearn.linear_model import LogisticRegression, MultiTaskElasticNetCV, MultiTaskLassoCV
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.metrics import mutual_info_score, normalized_mutual_info_score
 from sklearn.model_selection import GridSearchCV
@@ -222,6 +222,92 @@ def get_fitted_model(
         raise NotImplementedError("The model is not supported yet.")
     
     return model
+
+
+
+def get_fs_score(
+        X_train: pd.DataFrame,
+        X_test: pd.DataFrame,
+        y_train: pd.Series,
+        y_test: pd.Series,
+        activations_train: pd.DataFrame,
+        activations_test: pd.DataFrame,
+        cfg: Config,
+        fs_method: str
+    ) -> tuple[float, int]:
+
+    ct_output = ColumnTransformer(
+        transformers=[
+            (
+                "numerical",
+                MinMaxScaler(),
+                activations_train.columns
+            )
+        ],
+        verbose_feature_names_out=False
+    )
+    activations_train = ct_output.fit_transform(activations_train)
+
+    transformers = [
+        (
+            "nominal",
+            OneHotEncoder(drop="if_binary", sparse_output=False),
+            cfg.dataset_specs[cfg.dataset_name].get("nominal_features", []) or []
+        ), (
+            "numerical",
+            MinMaxScaler(),
+            X_train.filter(regex=r'^(age|n_|triage_)').columns.tolist()
+        )
+    ]
+
+    if fs_method == "lasso":
+        pipeline = Pipeline([
+            (
+                "preprocess",
+                ColumnTransformer(
+                    transformers=transformers,
+                    remainder="passthrough",
+                    verbose_feature_names_out=False
+                )
+            ), (
+                "select",
+                SelectFromModel(
+                    MultiTaskLassoCV(
+                        alphas=np.logspace(1, -3, 9),
+                        random_state=cfg.random_seed
+                    )
+                )
+            )
+        ])
+    elif fs_method == "elasticnet":
+        pipeline = Pipeline([
+            (
+                "preprocess",
+                ColumnTransformer(
+                    transformers=transformers,
+                    remainder="passthrough",
+                    verbose_feature_names_out=False
+                )
+            ), (
+                "select",
+                SelectFromModel(
+                    MultiTaskElasticNetCV(
+                        alphas=np.logspace(1, -3, 9),
+                        random_state=cfg.random_seed
+                    )
+                )
+            )
+        ])
+         
+    X_train = pipeline.fit_transform(X_train, activations_train)
+    X_test = pipeline.transform(X_test)
+    feature_names = pipeline.named_steps["preprocess"].get_feature_names_out()
+    features = len(feature_names[pipeline.named_steps["select"].get_support()])
+
+    model = get_fitted_model(X_train, y_train, cfg)
+    score = get_test_score(X_test, y_test, model, cfg)
+
+    return score, features
 
 
 
