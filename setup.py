@@ -1,9 +1,10 @@
+from pathlib import Path
 from setuptools import setup, find_packages
 
 
 setup(
     name="concept-tracer",
-    version="0.1.0",
+    version="0.1.1",
     description="ConceptTracer: Interactive Analysis of Concept Saliency and Selectivity in Neural Representations",
     author="Ricardo Knauer",
     author_email="ricardo.knauer@htw-berlin.de",
@@ -33,6 +34,8 @@ setup(
             "concept_tracer=concept_tracer.cli:main",
         ],
     },
+    long_description=Path("README.md").read_text(encoding="utf-8"),
+    long_description_content_type="text/markdown",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
